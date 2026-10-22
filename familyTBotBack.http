@@ -1,0 +1,6 @@
+@familyTBotBack_HostAddress = http://localhost:5239
+
+GET {{familyTBotBack_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
