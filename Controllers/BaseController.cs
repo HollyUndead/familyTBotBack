@@ -34,28 +34,16 @@ namespace familyTBotBack.Controllers
                 OpenIdConnectDefaults.AuthenticationScheme);
         }
 
-
         [Authorize]
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
-            var userIdClaim = User.FindFirst("Id")?.Value;
-            
-            long.TryParse(userIdClaim, out var userId);
+            var userId = long.Parse(User.FindFirst("Id")!.Value);
+
             FilterDefinition<Profile> filter =
                 Builders<Profile>.Filter.Eq(profile => profile.UserId, userId);
-            var update = Builders<Profile>.Update.Set(profile => profile.AuthOnWeb, true);
-            await _profiles.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true });
             Profile? prof = await _profiles.Find(Builders<Profile>.Filter.Eq(Profile => Profile.UserId, userId)).FirstOrDefaultAsync();
             return Ok(prof);
-        }
-
-        [Authorize]
-        [HttpPost("logout")]
-        public async Task<IActionResult> Logout()
-        {
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return Ok();
         }
 
         [Authorize]
