@@ -9,6 +9,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.IdentityModel.Tokens.Jwt;
+using CloudinaryDotNet;
+using familyTBotBack.Midlleware;
 
 namespace familyTBotBack
 {
@@ -24,6 +26,11 @@ namespace familyTBotBack
             var jwtIssuer = builder.Configuration["Jwt:Issuer"];
             var jwtAudienc = builder.Configuration["Jwt:Audience"];
 
+            var cfg = builder.Configuration.GetSection("Cloudinary");
+            var cloudinary = new Cloudinary(new Account(cfg["CloudName"], cfg["ApiKey"], cfg["ApiSecret"]));
+            cloudinary.Api.Secure = true;
+
+            builder.Services.AddSingleton(cloudinary);
             builder.Services.AddAuthentication(options =>
             {
                 options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -37,7 +44,7 @@ namespace familyTBotBack
                     ValidIssuer = jwtIssuer,
                     ValidateAudience = true,
                     ValidAudience = jwtAudienc,
-                    ValidateLifetime = true,
+                    ValidateLifetime = false,
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = jwtKey,
                     NameClaimType = "name",
@@ -100,6 +107,16 @@ namespace familyTBotBack
                         ctx.HandleResponse();
                         return ctx.Response.WriteAsync(ctx.Failure?.Message ?? "failed");
                     },
+                    OnUserInformationReceived = ctx => {
+                        Console.WriteLine("USERINFO: " + ctx.User.RootElement.GetRawText());
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = ctx =>
+                    {
+                        foreach (var c in ctx.Principal!.Claims)
+                            Console.WriteLine($"IDTOKEN CLAIM {c.Type} = {c.Value}");
+                        return Task.CompletedTask;
+                    },
                     OnTicketReceived = ctx =>
                     {
                         Console.WriteLine(ctx.Principal);
@@ -120,7 +137,7 @@ namespace familyTBotBack
                         var jwt = new JwtSecurityToken(issuer: jwtIssuer, audience: jwtAudienc, claims: claims, expires: DateTime.UtcNow.AddHours(8), signingCredentials: new SigningCredentials(jwtKey, SecurityAlgorithms.HmacSha256));
 
                         var token = new JwtSecurityTokenHandler().WriteToken(jwt);
-                        var frontend = builder.Configuration.GetConnectionString("CallbackFrontPath");
+                        var frontend = builder.Configuration.GetConnectionString("CallbackFrontPathLocal");
 
                         ctx.Response.Redirect($"{frontend}#token={token}");
                         ctx.HandleResponse();
@@ -134,12 +151,18 @@ namespace familyTBotBack
             builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(builder.Configuration.GetConnectionString("Mongo"))); 
             builder.Services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(builder.Configuration.GetConnectionString("mydb")));
             builder.Services.AddSingleton<MongoDbContext>();
-            builder.Services.AddHttpClient();
+            //builder.Services.AddHttpClient();
+            builder.Services.AddHttpClient("telegram", client =>
+            {
+                client.BaseAddress = new Uri(builder.Configuration["Telegram:TelegramApi"]!);
+            });
+            builder.Services.AddScoped<ImageMiddleware>();
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("Frontend", policy => policy
                     .WithOrigins(
                         "https://hollyundead.github.io",
+                        "https://hollyundead.github.io/familyTBotFront/tasks",
                         "https://wireless-kiln-departure.ngrok-free.dev")
                     .AllowAnyHeader()
                     .AllowAnyMethod());

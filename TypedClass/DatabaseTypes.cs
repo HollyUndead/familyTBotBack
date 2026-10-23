@@ -43,7 +43,7 @@ namespace familyTBotBack.TypedClass
         public string[] OverdueTasks { get; set; } = [];
         [BsonElement("starHistory")] 
         public string[] StarHistory { get; set;} = [];
-        [BsonElement("authOnWeb")]
-        public Boolean? AuthOnWeb { get; set; }
+        [BsonElement("avatarUrl")]
+        public string? avatarUrl{ get; set; }
     }
 }
